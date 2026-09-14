@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "912721749435",
+    "project_id": "queueless-fc35b",
+    "storage_bucket": "queueless-fc35b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:912721749435:android:1d3edd0381d8b1c041d09e",
+        "android_client_info": {
+          "package_name": "com.example.queueless_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCyElSiO0xHpo9ACKqmm6bM5007djfvr6A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
