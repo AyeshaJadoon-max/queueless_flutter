@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:queueless_flutter/widgets/confirm_join_sheet.dart';
 import 'package:queueless_flutter/models/organization_model.dart';
+import 'package:queueless_flutter/models/service_model.dart';
+import 'package:queueless_flutter/services/firestore_service.dart';
 
 class HospitalDetailsScreen extends StatelessWidget {
   final Organization organization;
@@ -14,18 +16,19 @@ class HospitalDetailsScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Background Image Placeholder
+          // Background Header Container
           Container(
             height: MediaQuery.of(context).size.height * 0.4,
             width: double.infinity,
             decoration: const BoxDecoration(
-              color: Color(0xFF6B7280),
-              // In a real app, you'd use DecorationImage here
+              color: Color(0xFF1B233A),
             ),
-            child: const Icon(Icons.business, color: Colors.white24, size: 100),
+            child: const Center(
+              child: Icon(Icons.business, color: Colors.white24, size: 100),
+            ),
           ),
           
-          // App Bar Area (Float over image)
+          // App Bar Area (Float over header)
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
             left: 24,
@@ -39,11 +42,11 @@ class HospitalDetailsScreen extends StatelessWidget {
             ),
           ),
           
-          // Draggable/Scrollable Details Sheet
+          // Details Sheet
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
-              height: MediaQuery.of(context).size.height * 0.65,
+              height: MediaQuery.of(context).size.height * 0.68,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -118,84 +121,65 @@ class HospitalDetailsScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     
                     // Info Cards
                     Row(
                       children: [
                         Expanded(child: _buildInfoCard('HOURS', '08:00 - 20:00', Icons.access_time, theme)),
                         const SizedBox(width: 16),
-                        Expanded(child: _buildInfoCard('WAITING', '12 People', Icons.people, theme)),
+                        Expanded(child: _buildInfoCard('STATUS', organization.isOpen ? 'Open Now' : 'Closed', Icons.check_circle_outline, theme)),
                       ],
                     ),
                     
                     const SizedBox(height: 24),
                     
-                    // Queue Insights
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFFEDF4FF)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'QUEUE INSIGHTS',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.primaryColor,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                '~35 min',
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Predicted waiting time',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: const Color(0xFF6B7280),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.flash_on, color: theme.primaryColor),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 32),
                     Text(
-                      'Available Services',
-                      style: theme.textTheme.titleLarge?.copyWith(
+                      'Available Services (Live from Firestore)',
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: const Color(0xFF1B233A),
                       ),
                     ),
                     const SizedBox(height: 16),
                     
-                    _buildServiceItem('General Consultation', Icons.medical_services_outlined, organization),
-                    const SizedBox(height: 12),
-                    _buildServiceItem('Lab Reports', Icons.science_outlined, organization),
-                    const SizedBox(height: 12),
-                    _buildServiceItem('Radiology / X-Ray', Icons.monitor_heart_outlined, organization),
+                    // Dynamic Stream of Services from Firestore
+                    StreamBuilder<List<AppService>>(
+                      stream: FirestoreService().streamServices(organization.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: Padding(
+                            padding: EdgeInsets.all(24.0),
+                            child: CircularProgressIndicator(),
+                          ));
+                        }
+                        
+                        final services = snapshot.data ?? [];
+                        if (services.isEmpty) {
+                          // Fallback default services if none added in sub-collection
+                          return Column(
+                            children: [
+                              _buildServiceItem('General Consultation', Icons.medical_services_outlined, organization),
+                              const SizedBox(height: 12),
+                              _buildServiceItem('Lab Reports & Diagnostics', Icons.science_outlined, organization),
+                              const SizedBox(height: 12),
+                              _buildServiceItem('Radiology / X-Ray', Icons.monitor_heart_outlined, organization),
+                            ],
+                          );
+                        }
+                        
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: services.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final service = services[index];
+                            return _buildServiceItem(service.name, Icons.medical_services_outlined, organization);
+                          },
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -209,7 +193,7 @@ class HospitalDetailsScreen extends StatelessWidget {
   Widget _buildCircularButton(IconData icon, VoidCallback onPressed) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.5),
+        color: Colors.black.withOpacity(0.3),
         shape: BoxShape.circle,
       ),
       child: IconButton(
@@ -260,7 +244,6 @@ class HospitalDetailsScreen extends StatelessWidget {
       builder: (context) {
         return InkWell(
           onTap: () {
-            // Show Confirm Join Sheet
             showModalBottomSheet(
               context: context,
               isScrollControlled: true,

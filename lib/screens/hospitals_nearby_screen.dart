@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:queueless_flutter/screens/hospital_details_screen.dart';
 import 'package:queueless_flutter/services/firestore_service.dart';
+import 'package:queueless_flutter/services/queue_service.dart';
 import 'package:queueless_flutter/models/organization_model.dart';
+import 'package:queueless_flutter/models/queue_model.dart';
 
 class HospitalsNearbyScreen extends StatelessWidget {
   const HospitalsNearbyScreen({super.key});
@@ -39,10 +41,8 @@ class HospitalsNearbyScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Divider
           const Divider(color: Color(0xFFE5E7EB), height: 1),
           
-          // Filters
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -57,7 +57,6 @@ class HospitalsNearbyScreen extends StatelessWidget {
             ),
           ),
           
-          // List
           Expanded(
             child: StreamBuilder<List<Organization>>(
               stream: FirestoreService().streamOrganizations(),
@@ -66,28 +65,39 @@ class HospitalsNearbyScreen extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return Center(child: Text('Error loading data: ${snapshot.error}'));
                 }
                 final orgs = snapshot.data ?? [];
                 if (orgs.isEmpty) {
-                  return const Center(child: Text('No hospitals found.'));
+                  return const Center(child: Text('No hospitals found in Firestore.'));
                 }
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  itemCount: orgs.length + 1, // +1 for the bottom padding
+                  itemCount: orgs.length + 1,
                   separatorBuilder: (context, index) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     if (index == orgs.length) return const SizedBox(height: 32);
                     final org = orgs[index];
-                    return _buildHospitalCard(
-                      context,
-                      organization: org,
-                      name: org.name,
-                      address: org.address,
-                      type: org.type,
-                      rating: org.rating,
-                      queueNum: '...',
-                      waitTime: '...',
+                    return StreamBuilder<QueueData?>(
+                      stream: QueueService().streamQueueData(
+                        org.type == 'Clinic' ? 'General Consultation' : 'General OPD',
+                      ),
+                      builder: (context, queueSnapshot) {
+                        final queueData = queueSnapshot.data;
+                        final waitingCount = queueData?.waitingCount ?? 3;
+                        final estWait = '~${waitingCount * 5} min';
+
+                        return _buildHospitalCard(
+                          context,
+                          organization: org,
+                          name: org.name,
+                          address: org.address,
+                          type: org.type,
+                          rating: org.rating,
+                          queueNum: '$waitingCount',
+                          waitTime: estWait,
+                        );
+                      },
                     );
                   },
                 );
@@ -147,144 +157,151 @@ class HospitalsNearbyScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFFF3F4F6)),
         ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE5E7EB),
-                  borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4AC4CA),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.apartment, color: Colors.white, size: 32),
                 ),
-                child: const Icon(Icons.apartment, color: Colors.white, size: 32),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, size: 14, color: Color(0xFF9CA3AF)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              address,
+                              style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF9CA3AF)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDF4FF),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              type,
+                              style: const TextStyle(
+                                color: Color(0xFF2A64F6),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              rating,
+                              style: const TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Divider(color: Color(0xFFF3F4F6), height: 1),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      name,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    const Text(
+                      'CURRENT QUEUE',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF9CA3AF),
+                      ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 14, color: Color(0xFF9CA3AF)),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            address,
-                            style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF9CA3AF)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEDF4FF),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            type,
-                            style: const TextStyle(
-                              color: Color(0xFF2A64F6),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            rating,
-                            style: const TextStyle(
-                              color: Color(0xFF10B981),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      '$queueNum People',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const Divider(color: Color(0xFFF3F4F6), height: 1),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'CURRENT QUEUE',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF9CA3AF),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'EST. WAIT',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF9CA3AF),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$queueNum People',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'EST. WAIT',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF9CA3AF),
+                    const SizedBox(height: 4),
+                    Text(
+                      waitTime,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.primaryColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    waitTime,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.primaryColor,
-                    ),
-                  ),
-                ],
-              ),
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF28303F), // Dark Gray/Blue
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ],
                 ),
-                child: const Text('Join'),
-              ),
-            ],
-          ),
-        ],
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HospitalDetailsScreen(organization: organization),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF28303F),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                  child: const Text('Join'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
