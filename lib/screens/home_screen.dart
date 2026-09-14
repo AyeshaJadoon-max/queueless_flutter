@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:queueless_flutter/screens/hospitals_nearby_screen.dart';
+import 'package:queueless_flutter/screens/my_queues_screen.dart';
+import 'package:queueless_flutter/screens/history_screen.dart';
+import 'package:queueless_flutter/screens/profile_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:queueless_flutter/models/token_model.dart';
 import 'package:queueless_flutter/models/queue_model.dart';
